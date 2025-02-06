@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>함수의 증가 감소</title>
+  <!-- MathJax 로드 -->
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+  <style>
+    body {
+      background-color: #000;  /* 검정 배경 */
+      color: #fff;             /* 흰색 글자 */
+      font-family: sans-serif;
+      margin: 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+    }
+    h1, h2, h3 {
+      text-align: center;
+    }
+    .energy-bar {
+      width: 300px;
+      height: 20px;
+      background-color: #888; /* 회색 배경 */
+      margin: 5px 0;
+      position: relative;
+      overflow: hidden;
+    }
+    .energy-fill {
+      height: 100%;
+      background-color: #fff; /* 흰색으로 표시 */
+      width: 100%;
+      transition: width 0.2s linear;
+    }
+    .question-box {
+      margin: 20px 0;
+      border: 1px solid #fff;
+      padding: 10px;
+    }
+    .choices {
+      margin-top: 10px;
+    }
+    .choice-btn {
+      display: block;
+      margin: 5px 0;
+      background: #222;
+      color: #fff;
+      border: 1px solid #fff;
+      padding: 5px;
+      cursor: pointer;
+      text-align: left;
+    }
+    #response {
+      white-space: pre-wrap; 
+      margin-top: 10px;
+      color: #ffcc00; /* 노란색 톤 */
+    }
+    .hidden {
+      display: none;
+    }
+    .highlight {
+      color: #ff6666; /* 오답 표시 등에 사용 */
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <h1>함수의 증가 감소</h1>
+  <!-- 이름 입력 -->
+  <label for="playerName">이름을 입력하세요: </label>
+  <input type="text" id="playerName" />
+  <br><br>
+  <!-- 난이도 선택 -->
+  <label for="difficulty">난이도를 선택하세요:</label>
+  <select id="difficulty">
+    <option value="hardest">최상 (20초 시작, 문제당 20점)</option>
+    <option value="hard">상 (30초 시작, 문제당 15점)</option>
+    <option value="normal">중 (40초 시작, 문제당 13점)</option>
+    <option value="easy">하 (시간 제한 없음, 문제당 10점)</option>
+  </select>
+  <button onclick="startGame()">게임 시작</button>
+
+  <div id="gameArea" class="hidden">
+    <h2>총 게임 시간: <span id="elapsedTime">0</span> 초</h2>
+    <div>남은 기회: <span id="lives">3</span></div>
+    <div class="energy-bar" id="energyBar"><div class="energy-fill" id="energyFill"></div></div>
+    <div>점수: <span id="score">0</span></div>
+
+    <div id="questionContainer"></div>
+
+    <div id="answerResult" class="highlight"></div>
+
+    <button onclick="nextQuestion()">다음 문제로</button>
+    <br/><br/>
+    <button onclick="endGame()">점수전송</button>
+    <div id="response"></div>
+  </div>
+
+</div>
+
+<script>
+/* -------------------------------------------------------------------
+   서버로 점수 전송하는 함수 (문제 요구사항 준수)
+   ------------------------------------------------------------------- */
+async function saveData(game, name, score, elapsedTime) {
+    const FUNCTION_URL = "https://us-central1-record-f420d.cloudfunctions.net/report";
+
+    const requestData = {
+        game,
+        name,
+        score: parseInt(score, 10),
+        elapsedTime: parseInt(elapsedTime, 10)
+    };
+
+    try {
+        const response = await fetch(FUNCTION_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+
+        const responseData = await response.json();
+
+        if (response.ok) {
+            document.getElementById('response').innerText =
+                "성공: " + JSON.stringify(responseData, null, 2);
+        } else {
+            document.getElementById('response').innerText =
+                "오류: " + JSON.stringify(responseData, null, 2);
+        }
+    } catch (error) {
+        console.error('요청 실패:', error);
+        document.getElementById('response').innerText =
+            "네트워크 오류: " + error.message;
+    }
+}
+
+/* -------------------------------------------------------------------
+   문제 데이터: 보기(4지선다) + 정답 인덱스 + 문제 설명(LaTeX)
+   ------------------------------------------------------------------- */
+const questionsData = [
+  {
+    problem: "함수 \\(f(x)=x^2-2x+2\\) 의 전체 실수 구간에서의 증가·감소 구간을 찾으시오.",
+    choices: [
+      "\\(( -\\infty, 1 )\\)에서 증가, \\((1,\\infty)\\)에서 감소",
+      "\\(( -\\infty, 1 )\\)에서 감소, \\((1,\\infty)\\)에서 증가",
+      "\\(( -\\infty, 0 )\\)에서 감소, \\((0,\\infty)\\)에서 증가",
+      "증가·감소 구간이 모두 존재하지 않는다"
+    ],
+    correct: 1,
+    answerStr: "정답: 2번"
+  },
+  {
+    problem: "함수 \\(f(x)=x^2-4x+2\\) 의 전체 실수 구간에서의 증가·감소 구간은?",
+    choices: [
+      "\\(( -\\infty, 2 )\\)에서 증가, \\((2,\\infty)\\)에서 감소",
+      "\\(( -\\infty, 2 )\\)에서 감소, \\((2,\\infty)\\)에서 증가",
+      "\\(( -\\infty, 0 )\\)에서 감소, \\((0,\\infty)\\)에서 증가",
+      "어느 구간에서도 증가하거나 감소하지 않는다"
+    ],
+    correct: 1,
+    answerStr: "정답: 2번"
+  },
+  {
+    problem: "함수 \\(f(x)=-\\tfrac12 x^2 - x\\) 의 전체 실수 구간에서의 증가·감소 구간은?",
+    choices: [
+      "\\(( -\\infty, -1 )\\)에서 증가, \\((-1,\\infty)\\)에서 감소",
+      "\\(( -\\infty, -1 )\\)에서 감소, \\((-1,\\infty)\\)에서 증가",
+      "모든 실수 구간에서 증가",
+      "모든 실수 구간에서 감소"
+    ],
+    correct: 0,
+    answerStr: "정답: 1번"
+  },
+  {
+    problem: "함수 \\(f(x)=-x^2 + 1\\) 의 전체 실수 구간에서의 증가·감소 구간은?",
+    choices: [
+      "\\(( -\\infty, 0 )\\)에서 증가, \\((0,\\infty)\\)에서 감소",
+      "\\(( -\\infty, 1 )\\)에서 증가, \\((1,\\infty)\\)에서 감소",
+      "모든 구간에서 감소",
+      "모든 구간에서 증가"
+    ],
+    correct: 0,
+    answerStr: "정답: 1번"
+  },
+  {
+    problem: "함수 \\(f(x)=-x^2 + 4x - 3\\) 의 전체 실수 구간에서의 증가·감소 구간은?",
+    choices: [
+      "\\(( -\\infty, 4 )\\)에서 감소, \\((4,\\infty)\\)에서 증가",
+      "\\(( -\\infty, 2 )\\)에서 증가, \\((2,\\infty)\\)에서 감소",
+      "\\(( -\\infty, 2 )\\)에서 감소, \\((2,\\infty)\\)에서 증가",
+      "모든 구간에서 감소"
+    ],
+    correct: 1,
+    answerStr: "정답: 2번"
+  },
+  {
+    problem: "함수 \\(f(x)=x^3 - x^2 + 1\\) 의 전체 실수 구간에서의 증가·감소 구간은?",
+    choices: [
+      "\\(( -\\infty, 0 )\\)에서 증가, \\((0,\\tfrac{2}{3})\\)에서 증가, \\((\\tfrac{2}{3},\\infty)\\)에서 감소",
+      "\\(( -\\infty, 0 )\\)에서 증가, \\((0,\\tfrac{2}{3})\\)에서 감소, \\((\\tfrac{2}{3},\\infty)\\)에서 증가",
+      "\\(( -\\infty, 0 )\\)에서 감소, \\((0,\\tfrac{2}{3})\\)에서 증가, \\((\\tfrac{2}{3},\\infty)\\)에서 감소",
+      "모든 구간에서 증가"
+    ],
+    correct: 1,
+    answerStr: "정답: 2번"
+  },
+  {
+    problem: "함수 \\(f(x)=x^3 - 3x^2 + 2\\) 의 전체 실수 구간에서의 증가·감소 구간은?",
+    choices: [
+      "\\(( -\\infty, 0 )\\)에서 증가, \\((0,2)\\)에서 감소, \\((2,\\infty)\\)에서 증가",
+      "\\(( -\\infty, 0 )\\)에서 감소, \\((0,2)\\)에서 증가, \\((2,\\infty)\\)에서 감소",
+      "\\(( -\\infty, 2 )\\)에서 증가, \\((2,\\infty)\\)에서 감소",
+      "모든 구간에서 감소"
+    ],
+    correct: 0,
+    answerStr: "정답: 1번"
+  },
+  {
+    problem: "함수 \\(f(x)=x^3 + 6x^2 + 1\\) 의 전체 실수 구간에서의 증가·감소 구간은?",
+    choices: [
+      "\\(( -\\infty, -4 )\\)에서 감소, \\((-4,0)\\)에서 증가, \\((0,\\infty)\\)에서 감소",
+      "\\(( -\\infty, -4 )\\)에서 증가, \\((-4,0)\\)에서 감소, \\((0,\\infty)\\)에서 증가",
+      "\\(( -\\infty, -4 )\\)에서 감소, \\((-4,0)\\)에서 감소, \\((0,\\infty)\\)에서 증가",
+      "\\(( -\\infty, 0 )\\)에서 증가, \\((0,\\infty)\\)에서 감소"
+    ],
+    correct: 1,
+    answerStr: "정답: 2번"
+  },
+  {
+    problem: "함수 \\(f(x)=x^3 - 6x^2 + 9x - 2\\) 의 증가·감소 구간은?",
+    choices: [
+      "\\(( -\\infty, 1 )\\)에서 증가, \\((1,3)\\)에서 감소, \\((3,\\infty)\\)에서 증가",
+      "\\(( -\\infty, 1 )\\)에서 감소, \\((1,3)\\)에서 증가, \\((3,\\infty)\\)에서 감소",
+      "\\(( -\\infty, 1 )\\)에서 증가, \\((1,3)\\)에서 증가, \\((3,\\infty)\\)에서 감소",
+      "\\(( -\\infty, 1 )\\)에서 증가, \\((1,3)\\)에서 감소, \\((3,\\infty)\\)에서 감소"
+    ],
+    correct: 0,
+    answerStr: "정답: 1번"
+  },
+  {
+    problem: "함수 \\(f(x)=-x^3 + x^2 - x\\) 가 전체 실수 구간에서 보이는 증가·감소 양상은?",
+    choices: [
+      "모든 실수 구간에서 증가",
+      "모든 실수 구간에서 감소",
+      "구간에 따라 증가 혹은 감소",
+      "\\(x=0\\)에서만 극값을 갖고 나머지는 증가"
+    ],
+    correct: 1,
+    answerStr: "정답: 2번"
+  },
+  {
+    problem: "함수 \\(f(x)=-x^3 - 3x^2 + 24x - 1\\) 의 증가·감소 구간을 찾으시오.",
+    choices: [
+      "\\(( -\\infty, -4 )\\)에서 증가, \\((-4,2)\\)에서 증가, \\((2,\\infty)\\)에서 감소",
+      "\\(( -\\infty, -4 )\\)에서 감소, \\((-4,2)\\)에서 증가, \\((2,\\infty)\\)에서 감소",
+      "\\(( -\\infty, -4 )\\)에서 감소, \\((-4,2)\\)에서 감소, \\((2,\\infty)\\)에서 증가",
+      "\\(( -\\infty, -4 )\\)에서 감소, \\((-4,2)\\)에서 증가, \\((2,\\infty)\\)에서 증가"
+    ],
+    correct: 1,
+    answerStr: "정답: 2번"
+  },
+  {
+    problem: "함수 \\(f(x)=-2x^3 + 6x + 2\\) 의 전체 실수 구간에서의 증가·감소 구간은?",
+    choices: [
+      "\\(( -\\infty, -1 )\\)에서 증가, \\((-1,1)\\)에서 증가, \\((1,\\infty)\\)에서 감소",
+      "\\(( -\\infty, -1 )\\)에서 감소, \\((-1,1)\\)에서 증가, \\((1,\\infty)\\)에서 감소",
+      "\\(( -\\infty, -1 )\\)에서 감소, \\((-1,1)\\)에서 감소, \\((1,\\infty)\\)에서 증가",
+      "\\(( -\\infty, -1 )\\)에서 감소, \\((-1,1)\\)에서 증가, \\((1,\\infty)\\)에서 증가"
+    ],
+    correct: 1,
+    answerStr: "정답: 2번"
+  },
+  {
+    problem: "구간 \\((0,\\infty)\\)에서 \\(f(x)=x^2\\) 의 증가·감소를 조사하시오.",
+    choices: [
+      "\\((0,\\infty)\\)에서 증가",
+      "\\((0,\\infty)\\)에서 감소",
+      "일부 구간에서 증가, 일부 구간에서 감소",
+      "상수 함수"
+    ],
+    correct: 0,
+    answerStr: "정답: 1번"
+  },
+  {
+    problem: "구간 \\([0,\\infty)\\)에서 \\(f(x)=x^2\\) 의 증가·감소를 조사하시오.",
+    choices: [
+      "\\([0,\\infty)\\)에서 증가",
+      "\\([0,2)\\)에서 감소, \\([2,\\infty)\\)에서 증가",
+      "모든 구간에서 감소",
+      "변화 없이 일정"
+    ],
+    correct: 0,
+    answerStr: "정답: 1번"
+  },
+  {
+    problem: "구간 \\((0,\\infty)\\)에서 \\(f(x)=-x^2\\) 의 증가·감소를 조사하시오.",
+    choices: [
+      "\\((0,\\infty)\\)에서 증가",
+      "\\((0,\\infty)\\)에서 감소",
+      "\\((0,1)\\)에서 증가, \\((1,\\infty)\\)에서 감소",
+      "증감 변화가 없다"
+    ],
+    correct: 1,
+    answerStr: "정답: 2번"
+  },
+  {
+    problem: "구간 \\([0,\\infty)\\)에서 \\(f(x)=-x^2\\) 가 보이는 증감 양상은?",
+    choices: [
+      "모든 구간에서 증가",
+      "모든 구간에서 감소",
+      "\\(x=0\\)을 경계로 증가·감소가 갈린다",
+      "상수 함수"
+    ],
+    correct: 1,
+    answerStr: "정답: 2번"
+  },
+  {
+    problem: "구간 \\((0,\\infty)\\)에서 \\(f(x)=x^2 - 1\\) 의 증가·감소를 조사하시오.",
+    choices: [
+      "\\((0,\\infty)\\)에서 증가",
+      "\\((0,\\infty)\\)에서 감소",
+      "\\((0,1)\\)에서 감소, \\((1,\\infty)\\)에서 증가",
+      "변화를 알 수 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: 1번"
+  },
+  {
+    problem: "구간 \\([1,\\infty)\\)에서 \\(f(x)=x^2 - 2x\\) 의 증가·감소를 조사하시오.",
+    choices: [
+      "\\([1,\\infty)\\)에서 증가",
+      "\\([1,2)\\)에서 감소, \\([2,\\infty)\\)에서 증가",
+      "\\([1,\\infty)\\)에서 감소",
+      "특정 구간에서만 증가"
+    ],
+    correct: 0,
+    answerStr: "정답: 1번"
+  },
+  {
+    problem: "구간 \\((0,\\infty)\\)에서 \\(f(x)=-x^2 + 3\\) 의 증가·감소를 조사하시오.",
+    choices: [
+      "\\((0,\\infty)\\)에서 증가",
+      "\\((0,\\infty)\\)에서 감소",
+      "일부 구간에서만 감소, 그 외에는 증가",
+      "\\((0,2)\\)에서 증가, \\((0,2)\\)에서 감소"
+    ],
+    correct: 1,
+    answerStr: "정답: 2번"
+  },
+  {
+    problem: "전체 실수 구간에서 \\(f(x)=x^3\\) 의 증감 양상은?",
+    choices: [
+      "모든 구간에서 증가",
+      "모든 구간에서 감소",
+      "\\(( -\\infty, 0 )\\)에서 감소, \\((0,\\infty)\\)에서 증가",
+      "\\(( -\\infty, 0 )\\)에서 증가, \\((0,\\infty)\\)에서 감소"
+    ],
+    correct: 0,
+    answerStr: "정답: 1번"
+  },
+  {
+    problem: "전체 실수 구간에서 \\(f(x)=-x^3\\) 의 증감 양상은?",
+    choices: [
+      "모든 구간에서 증가",
+      "모든 구간에서 감소",
+      "\\(( -\\infty, 0 )\\)에서 증가, \\((0,\\infty)\\)에서 감소",
+      "\\(( -\\infty, 0 )\\)에서 감소, \\((0,\\infty)\\)에서 증가"
+    ],
+    correct: 1,
+    answerStr: "정답: 2번"
+  },
+  {
+    problem: "\\(f(x)=-x^3 + 3x^2 + 9x + 7\\) 이 증가하는 구간을 구하시오.",
+    choices: [
+      "\\(( -\\infty, -1 )\\)",
+      "\\((-1,3)\\)",
+      "\\((3,\\infty)\\)",
+      "\\((-1,3)\\)와 \\((3,\\infty)\\)"
+    ],
+    correct: 1,
+    answerStr: "정답: 2번"
+  },
+  {
+    problem: "\\(f(x)=-x^3 + \\dfrac{9}{2} x^2 + 30x + 10\\) 이 증가하는 구간을 구하시오.",
+    choices: [
+      "\\(( -\\infty, -2 )\\)",
+      "\\((-2,5)\\)",
+      "\\((5,\\infty)\\)",
+      "\\(( -\\infty, -2 )\\)과 \\((5,\\infty)\\)"
+    ],
+    correct: 1,
+    answerStr: "정답: 2번"
+  },
+  {
+    problem: "\\(a>1\\)일 때, \\(f(x)=\\dfrac{1}{3} x^3 - \\dfrac{1}{2}(a+1)x^2 + a x + 3\\) 이 감소하는 구간은?",
+    choices: [
+      "\\(( -\\infty, 1 )\\)",
+      "\\((1,a)\\)",
+      "\\((a,\\infty)\\)",
+      "감소 구간이 없다"
+    ],
+    correct: 1,
+    answerStr: "정답: 2번"
+  },
+  {
+    problem: "\\(f(x)=x^3 - 3x^2 + kx + 2\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
+    choices: [
+      "\\(k \\ge 3\\)",
+      "\\(k \\le -3\\)",
+      "\\(-3 < k < 3\\)",
+      "그런 \\(k\\)는 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: \\(k\\ge 3\\)"
+  },
+  {
+    problem: "\\(f(x)=x^3 - kx^2 + (k+6)x + 5\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
+    choices: [
+      "\\(-3 \\le k \\le 6\\)",
+      "\\(k=0\\)",
+      "\\(k \\ge 6\\)",
+      "그런 \\(k\\)는 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: \\(-3 \\le k \\le 6\\)"
+  },
+  {
+    problem: "\\(f(x)=x^3 + kx^2 + kx\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
+    choices: [
+      "\\(0 \\le k \\le 3\\)",
+      "\\(k=0\\)",
+      "\\(-1 < k < 1\\)",
+      "그런 \\(k\\)는 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: \\(0\\le k\\le 3\\)"
+  },
+  {
+    problem: "\\(f(x)=x^3 - 2kx^2 + kx\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
+    choices: [
+      "\\(0 \\le k \\le \\tfrac{3}{4}\\)",
+      "\\(k \\le 0\\)",
+      "\\(k \\ge 1\\)",
+      "그런 \\(k\\)는 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: \\(0\\le k\\le \\tfrac{3}{4}\\)"
+  },
+  {
+    problem: "\\(f(x)=x^3 + kx^2 -4kx\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
+    choices: [
+      "\\(-12 \\le k \\le 0\\)",
+      "\\(k \\ge 0\\)",
+      "\\(k \\le -12\\)",
+      "그런 \\(k\\)는 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: \\(-12\\le k\\le 0\\)"
+  },
+  {
+    problem: "\\(f(x)=x^3 + 2kx^2 + 12x -5\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
+    choices: [
+      "\\(-3 \\le k \\le 3\\)",
+      "\\(k \\ge 3\\)",
+      "\\(k \\le -3\\)",
+      "그런 \\(k\\)는 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: \\(-3\\le k\\le 3\\)"
+  },
+  {
+    problem: "\\(f(x)=-x^3 + x^2 + kx\\) 가 실수 전체 구간에서 단조 감소하려면 \\(k\\)에 어떤 조건이 필요한가?",
+    choices: [
+      "\\(k \\le -\\tfrac{1}{3}\\)",
+      "\\(k \\ge \\tfrac{1}{3}\\)",
+      "\\(k=-\\tfrac{1}{3}\\)만 성립",
+      "그런 \\(k\\)는 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: \\(k\\le -\\tfrac{1}{3}\\)"
+  },
+  {
+    problem: "\\(f(x)=-x^3 + kx^2 - 3x\\) 가 실수 전체 구간에서 단조 감소하려면 \\(k\\)에 어떤 조건이 필요한가?",
+    choices: [
+      "\\(-3 \\le k \\le 3\\)",
+      "\\(k \\le -3\\)",
+      "\\(k=0\\)",
+      "그런 \\(k\\)는 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: \\(-3\\le k\\le 3\\)"
+  },
+  {
+    problem: "\\(f(x)=-\\dfrac{1}{3}x^3 + kx^2 - (5k-4)x + 2\\) 가 실수 전체 구간에서 단조 감소하려면 \\(k\\)에 어떤 조건이 필요한가?",
+    choices: [
+      "\\(1 \\le k \\le 4\\)",
+      "\\(k \\le 1\\)",
+      "\\(k \\ge 4\\)",
+      "그런 \\(k\\)는 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: \\(1\\le k\\le 4\\)"
+  },
+  {
+    problem: "\\(f(x)=x^3 + (k+1)x^2 + (k+1)x -1\\) 이 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
+    choices: [
+      "\\(-1 \\le k \\le 2\\)",
+      "\\(k \\le -1\\)",
+      "\\(k \\ge 2\\)",
+      "그런 \\(k\\)는 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: \\(-1\\le k\\le 2\\)"
+  },
+  {
+    problem: "\\(f(x)=x^3 - (k+2)x^2 + 3kx\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
+    choices: [
+      "\\(1 \\le k \\le 4\\)",
+      "\\(-4 \\le k \\le -1\\)",
+      "\\(k \\le -1\\)",
+      "그런 \\(k\\)는 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: \\(1\\le k\\le 4\\)"
+  },
+  {
+    problem: "\\(f(x)=x^3 - 3kx^2 + 3kx\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
+    choices: [
+      "\\(0 \\le k \\le 1\\)",
+      "\\(k \\le 0\\)",
+      "\\(k \\ge 1\\)",
+      "그런 \\(k\\)는 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: \\(0\\le k\\le 1\\)"
+  },
+  {
+    problem: "\\(f(x)=x^3 - kx^2 + 4kx + 4\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
+    choices: [
+      "\\(0 \\le k \\le 12\\)",
+      "\\(k=12\\)",
+      "\\(k \\ge 12\\)",
+      "그런 \\(k\\)는 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: \\(0\\le k\\le 12\\)"
+  },
+  {
+    // --- 수정된 문제: 구간 (0,3)에서 감소하도록 하는 k의 범위 ---
+    problem: "\\(f(x)=x^3 - 3x^2 + kx + 1\\) 이 구간 \\((0,3)\\)에서 감소하도록 하는 \\(k\\)의 범위는?",
+    choices: [
+      "\\(k \\le -9\\)",
+      "\\(-9 < k < 0\\)",
+      "\\(k \\ge 0\\)",
+      "그런 \\(k\\)는 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: 1번 (\\(k \\le -9\\))"
+  },
+  {
+    // --- 수정된 문제: 구간 (-2,1)에서 감소하도록 하는 k의 범위 ---
+    problem: "\\(f(x)=x^3 - 6x^2 + kx +1\\) 이 구간 \\((-2,1)\\)에서 감소하도록 하는 \\(k\\)의 범위는?",
+    choices: [
+      "\\(k \\le -36\\)",
+      "\\(-36 < k \\le -3\\)",
+      "모든 \\(k\\)",
+      "그런 \\(k\\)는 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: 1번 (\\(k \\le -36\\))"
+  },
+  {
+    // --- 수정된 문제: 구간 (1,2)에서 증가하도록 하는 k의 범위 ---
+    problem: "\\(f(x)=-x^3 + x^2 + kx -4\\) 이 구간 \\((1,2)\\)에서 증가하도록 하는 \\(k\\)의 범위는?",
+    choices: [
+      "\\(k \\ge 8\\)",
+      "\\(k < 8\\)",
+      "모든 \\(k\\)",
+      "그런 \\(k\\)는 없다"
+    ],
+    correct: 0,
+    answerStr: "정답: 1번 (\\(k \\ge 8\\))"
+  }
+  // 마지막 두 문제(상수 a,b를 구하는 문제)는 모호하여 삭제함.
+];
+
+/* 셔플 함수 (문제나 보기 등을 무작위로 재배치) */
+function shuffleArray(array) {
+  for(let i=array.length-1; i>0; i--){
+    const j = Math.floor(Math.random()* (i+1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+}
+
+/* 전역 변수들 */
+let questionIndex = 0;     // 현재 문제 인덱스
+let score = 0;             // 점수
+let lives = 3;             // 남은 기회
+let totalElapsed = 0;      // 전체 게임 진행 시간(초)
+let timerId = null;        // setInterval용
+let startTime = 0;         // 게임 시작 시각
+let timeLimit = 0;         // 현재 문제에서의 남은 시간 (하 난이도라면 제한 없음)
+let timeDecrementId = null; // 에너지바 감소용
+let pointPerQuestion = 0;  // 난이도별 점수
+let indefiniteTime = false; // 하 난이도(시간제한없음) 여부
+
+/* -------------------------------------------------------------------
+   게임 시작
+   ------------------------------------------------------------------- */
+function startGame(){
+  const name = document.getElementById('playerName').value.trim();
+  if(!name){
+    alert("이름을 입력해주세요!");
+    return;
+  }
+  const difficultySel = document.getElementById('difficulty').value;
+  switch(difficultySel){
+    case 'hardest':
+      timeLimit = 20;
+      pointPerQuestion = 20;
+      indefiniteTime = false;
+      break;
+    case 'hard':
+      timeLimit = 30;
+      pointPerQuestion = 15;
+      indefiniteTime = false;
+      break;
+    case 'normal':
+      timeLimit = 40;
+      pointPerQuestion = 13;
+      indefiniteTime = false;
+      break;
+    default:
+      timeLimit = 999999; // 사실상 무제한
+      pointPerQuestion = 10;
+      indefiniteTime = true;
+      break;
+  }
+  document.getElementById('gameArea').classList.remove('hidden');
+  document.getElementById('playerName').disabled = true;
+  document.getElementById('difficulty').disabled = true;
+
+  // 전체 문제 셔플
+  shuffleArray(questionsData);
+
+  questionIndex = 0;
+  score = 0;
+  lives = 3;
+  totalElapsed = 0;
+  document.getElementById('score').innerText = score;
+  document.getElementById('lives').innerText = lives;
+  document.getElementById('elapsedTime').innerText = 0;
+  showQuestion(questionsData[questionIndex]);
+
+  startTime = Date.now();
+  // 전체 진행 시간 타이머
+  if(timerId) clearInterval(timerId);
+  timerId = setInterval(() => {
+    totalElapsed = Math.floor((Date.now()-startTime)/1000);
+    document.getElementById('elapsedTime').innerText = totalElapsed;
+  }, 1000);
+
+  // 에너지바 (남은 시간) 타이머
+  if(timeDecrementId) clearInterval(timeDecrementId);
+  timeDecrementId = setInterval(() => {
+    if(!indefiniteTime){
+      timeLimit -= 1;
+      if(timeLimit <= 0){
+        // 시간 초과 -> 기회 1 감소
+        lives--;
+        if(lives<=0) {
+          endGame();
+          return;
+        }
+        document.getElementById('lives').innerText = lives;
+        // 바로 다음문제로 넘어감
+        nextQuestion(true); 
+      }
+      updateEnergyBar();
+    }
+  }, 1000);
+  updateEnergyBar();
+}
+
+/* -------------------------------------------------------------------
+   문제 표시
+   ------------------------------------------------------------------- */
+function showQuestion(q) {
+  // 보기 섞기
+  const cpyChoices = q.choices.slice();
+  shuffleArray(cpyChoices);
+
+  // 문제 표시
+  const container = document.getElementById('questionContainer');
+  container.innerHTML = `
+    <div class="question-box">
+      <div class="problem">${q.problem}</div>
+      <div class="choices" id="choiceArea"></div>
+    </div>
+  `;
+  // 보기 표시
+  const choiceDiv = container.querySelector("#choiceArea");
+  cpyChoices.forEach(choice => {
+    const btn = document.createElement("button");
+    btn.className = "choice-btn";
+    btn.innerHTML = choice;
+    btn.addEventListener("click", () => checkAnswer(q, choice));
+    choiceDiv.appendChild(btn);
+  });
+  // 수식 렌더링
+  MathJax.typeset();
+}
+
+/* -------------------------------------------------------------------
+   답안 체크
+   ------------------------------------------------------------------- */
+function checkAnswer(q, chosen) {
+  // 정답 찾기
+  const idx = q.choices.indexOf(chosen);
+  // 정답 인덱스
+  const correctChoice = q.choices[q.correct];
+
+  let resultMsg = "";
+  if(chosen === correctChoice) {
+    // 정답
+    score += pointPerQuestion;
+    document.getElementById('score').innerText = score;
+    resultMsg = "정답! 점수 +" + pointPerQuestion;
+  } else {
+    // 오답
+    lives--;
+    document.getElementById('lives').innerText = lives;
+    resultMsg = "틀렸습니다. " + q.answerStr;
+    if(lives<=0){
+      endGame();
+      return;
+    }
+  }
+  document.getElementById('answerResult').innerText = resultMsg;
+}
+
+/* -------------------------------------------------------------------
+   다음 문제로
+   (forceNext=true 이면 현재 문제 정답체크 없이 강제로 넘김)
+   ------------------------------------------------------------------- */
+function nextQuestion(forceNext=false) {
+  if(!forceNext){
+    // 문제를 맞히거나 틀렸을 때 이미 lives가 감소했을 수도 있음
+  }
+  // 모든 문제를 다 풀었으면 다시 섞어서 진행
+  questionIndex++;
+  if(questionIndex>=questionsData.length){
+    shuffleArray(questionsData);
+    questionIndex=0;
+  }
+  // 난이도에 따라 시간 리셋 (하 난이도는 제한 없음)
+  if(!indefiniteTime){
+    switch(document.getElementById('difficulty').value){
+      case 'hardest':
+        timeLimit=20; break;
+      case 'hard':
+        timeLimit=30; break;
+      case 'normal':
+        timeLimit=40; break;
+    }
+  }
+
+  document.getElementById('answerResult').innerText="";
+  showQuestion(questionsData[questionIndex]);
+  updateEnergyBar();
+}
+
+/* -------------------------------------------------------------------
+   에너지바 표시 업데이트
+   ------------------------------------------------------------------- */
+function updateEnergyBar(){
+  const bar = document.getElementById('energyFill');
+  if(indefiniteTime){
+    bar.style.width = "100%"; 
+  } else {
+    let maxT=40;
+    const diff = document.getElementById('difficulty').value;
+    if(diff==='hardest') maxT=20;
+    if(diff==='hard') maxT=30;
+    let ratio = (timeLimit / maxT);
+    if(ratio<0) ratio=0;
+    bar.style.width = (ratio*100)+"%";
+  }
+}
+
+/* -------------------------------------------------------------------
+   게임 종료 -> 전송버튼
+   ------------------------------------------------------------------- */
+function endGame(){
+  if(timerId) clearInterval(timerId);
+  if(timeDecrementId) clearInterval(timeDecrementId);
+  alert("게임이 종료되었습니다. 점수: " + score);
+}
+
+/* -------------------------------------------------------------------
+   최종 점수 전송
+   ------------------------------------------------------------------- */
+function sendScore(){
+  const name = document.getElementById('playerName').value.trim();
+  saveData("함수의 증가 감소", name, score, totalElapsed);
+}
+</script>
+
+<!-- 점수전송 버튼 오버라이드: endGame() 후에 누르는 용도 -->
+<script>
+function endGame(){
+  if(timerId) clearInterval(timerId);
+  if(timeDecrementId) clearInterval(timeDecrementId);
+  alert("게임이 종료되었습니다. 점수: " + score);
+  // 게임 영역 잠금(선택지 등)
+}
+function endGameButton(){
+  sendScore();
+}
+</script>
+
+</body>
+</html>

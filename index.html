@@ -62,6 +62,10 @@
     .highlight {
       color: #ff6666; /* 오답 표시 등에 사용 */
     }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -92,9 +96,10 @@
 
     <div id="answerResult" class="highlight"></div>
 
-    <button onclick="nextQuestion()">다음 문제로</button>
+    <!-- 다음 문제 버튼은 기본적으로 비활성화 -->
+    <button id="nextBtn" onclick="nextQuestion()" disabled>다음 문제로</button>
     <br/><br/>
-    <button onclick="endGame()">점수전송</button>
+    <button onclick="sendScore()">점수전송</button>
     <div id="response"></div>
   </div>
 
@@ -140,7 +145,7 @@ async function saveData(game, name, score, elapsedTime) {
 }
 
 /* -------------------------------------------------------------------
-   문제 데이터: 보기(4지선다) + 정답 인덱스 + 문제 설명(LaTeX)
+   문제 데이터 (중고등학생이 풀기에 적당한 문제들)
    ------------------------------------------------------------------- */
 const questionsData = [
   {
@@ -331,28 +336,6 @@ const questionsData = [
     answerStr: "정답: 1번"
   },
   {
-    problem: "구간 \\([1,\\infty)\\)에서 \\(f(x)=x^2 - 2x\\) 의 증가·감소를 조사하시오.",
-    choices: [
-      "\\([1,\\infty)\\)에서 증가",
-      "\\([1,2)\\)에서 감소, \\([2,\\infty)\\)에서 증가",
-      "\\([1,\\infty)\\)에서 감소",
-      "특정 구간에서만 증가"
-    ],
-    correct: 0,
-    answerStr: "정답: 1번"
-  },
-  {
-    problem: "구간 \\((0,\\infty)\\)에서 \\(f(x)=-x^2 + 3\\) 의 증가·감소를 조사하시오.",
-    choices: [
-      "\\((0,\\infty)\\)에서 증가",
-      "\\((0,\\infty)\\)에서 감소",
-      "일부 구간에서만 감소, 그 외에는 증가",
-      "\\((0,2)\\)에서 증가, \\((0,2)\\)에서 감소"
-    ],
-    correct: 1,
-    answerStr: "정답: 2번"
-  },
-  {
     problem: "전체 실수 구간에서 \\(f(x)=x^3\\) 의 증감 양상은?",
     choices: [
       "모든 구간에서 증가",
@@ -384,230 +367,21 @@ const questionsData = [
     ],
     correct: 1,
     answerStr: "정답: 2번"
-  },
-  {
-    problem: "\\(f(x)=-x^3 + \\dfrac{9}{2} x^2 + 30x + 10\\) 이 증가하는 구간을 구하시오.",
-    choices: [
-      "\\(( -\\infty, -2 )\\)",
-      "\\((-2,5)\\)",
-      "\\((5,\\infty)\\)",
-      "\\(( -\\infty, -2 )\\)과 \\((5,\\infty)\\)"
-    ],
-    correct: 1,
-    answerStr: "정답: 2번"
-  },
-  {
-    problem: "\\(a>1\\)일 때, \\(f(x)=\\dfrac{1}{3} x^3 - \\dfrac{1}{2}(a+1)x^2 + a x + 3\\) 이 감소하는 구간은?",
-    choices: [
-      "\\(( -\\infty, 1 )\\)",
-      "\\((1,a)\\)",
-      "\\((a,\\infty)\\)",
-      "감소 구간이 없다"
-    ],
-    correct: 1,
-    answerStr: "정답: 2번"
-  },
-  {
-    problem: "\\(f(x)=x^3 - 3x^2 + kx + 2\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
-    choices: [
-      "\\(k \\ge 3\\)",
-      "\\(k \\le -3\\)",
-      "\\(-3 < k < 3\\)",
-      "그런 \\(k\\)는 없다"
-    ],
-    correct: 0,
-    answerStr: "정답: \\(k\\ge 3\\)"
-  },
-  {
-    problem: "\\(f(x)=x^3 - kx^2 + (k+6)x + 5\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
-    choices: [
-      "\\(-3 \\le k \\le 6\\)",
-      "\\(k=0\\)",
-      "\\(k \\ge 6\\)",
-      "그런 \\(k\\)는 없다"
-    ],
-    correct: 0,
-    answerStr: "정답: \\(-3 \\le k \\le 6\\)"
-  },
-  {
-    problem: "\\(f(x)=x^3 + kx^2 + kx\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
-    choices: [
-      "\\(0 \\le k \\le 3\\)",
-      "\\(k=0\\)",
-      "\\(-1 < k < 1\\)",
-      "그런 \\(k\\)는 없다"
-    ],
-    correct: 0,
-    answerStr: "정답: \\(0\\le k\\le 3\\)"
-  },
-  {
-    problem: "\\(f(x)=x^3 - 2kx^2 + kx\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
-    choices: [
-      "\\(0 \\le k \\le \\tfrac{3}{4}\\)",
-      "\\(k \\le 0\\)",
-      "\\(k \\ge 1\\)",
-      "그런 \\(k\\)는 없다"
-    ],
-    correct: 0,
-    answerStr: "정답: \\(0\\le k\\le \\tfrac{3}{4}\\)"
-  },
-  {
-    problem: "\\(f(x)=x^3 + kx^2 -4kx\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
-    choices: [
-      "\\(-12 \\le k \\le 0\\)",
-      "\\(k \\ge 0\\)",
-      "\\(k \\le -12\\)",
-      "그런 \\(k\\)는 없다"
-    ],
-    correct: 0,
-    answerStr: "정답: \\(-12\\le k\\le 0\\)"
-  },
-  {
-    problem: "\\(f(x)=x^3 + 2kx^2 + 12x -5\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
-    choices: [
-      "\\(-3 \\le k \\le 3\\)",
-      "\\(k \\ge 3\\)",
-      "\\(k \\le -3\\)",
-      "그런 \\(k\\)는 없다"
-    ],
-    correct: 0,
-    answerStr: "정답: \\(-3\\le k\\le 3\\)"
-  },
-  {
-    problem: "\\(f(x)=-x^3 + x^2 + kx\\) 가 실수 전체 구간에서 단조 감소하려면 \\(k\\)에 어떤 조건이 필요한가?",
-    choices: [
-      "\\(k \\le -\\tfrac{1}{3}\\)",
-      "\\(k \\ge \\tfrac{1}{3}\\)",
-      "\\(k=-\\tfrac{1}{3}\\)만 성립",
-      "그런 \\(k\\)는 없다"
-    ],
-    correct: 0,
-    answerStr: "정답: \\(k\\le -\\tfrac{1}{3}\\)"
-  },
-  {
-    problem: "\\(f(x)=-x^3 + kx^2 - 3x\\) 가 실수 전체 구간에서 단조 감소하려면 \\(k\\)에 어떤 조건이 필요한가?",
-    choices: [
-      "\\(-3 \\le k \\le 3\\)",
-      "\\(k \\le -3\\)",
-      "\\(k=0\\)",
-      "그런 \\(k\\)는 없다"
-    ],
-    correct: 0,
-    answerStr: "정답: \\(-3\\le k\\le 3\\)"
-  },
-  {
-    problem: "\\(f(x)=-\\dfrac{1}{3}x^3 + kx^2 - (5k-4)x + 2\\) 가 실수 전체 구간에서 단조 감소하려면 \\(k\\)에 어떤 조건이 필요한가?",
-    choices: [
-      "\\(1 \\le k \\le 4\\)",
-      "\\(k \\le 1\\)",
-      "\\(k \\ge 4\\)",
-      "그런 \\(k\\)는 없다"
-    ],
-    correct: 0,
-    answerStr: "정답: \\(1\\le k\\le 4\\)"
-  },
-  {
-    problem: "\\(f(x)=x^3 + (k+1)x^2 + (k+1)x -1\\) 이 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
-    choices: [
-      "\\(-1 \\le k \\le 2\\)",
-      "\\(k \\le -1\\)",
-      "\\(k \\ge 2\\)",
-      "그런 \\(k\\)는 없다"
-    ],
-    correct: 0,
-    answerStr: "정답: \\(-1\\le k\\le 2\\)"
-  },
-  {
-    problem: "\\(f(x)=x^3 - (k+2)x^2 + 3kx\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
-    choices: [
-      "\\(1 \\le k \\le 4\\)",
-      "\\(-4 \\le k \\le -1\\)",
-      "\\(k \\le -1\\)",
-      "그런 \\(k\\)는 없다"
-    ],
-    correct: 0,
-    answerStr: "정답: \\(1\\le k\\le 4\\)"
-  },
-  {
-    problem: "\\(f(x)=x^3 - 3kx^2 + 3kx\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
-    choices: [
-      "\\(0 \\le k \\le 1\\)",
-      "\\(k \\le 0\\)",
-      "\\(k \\ge 1\\)",
-      "그런 \\(k\\)는 없다"
-    ],
-    correct: 0,
-    answerStr: "정답: \\(0\\le k\\le 1\\)"
-  },
-  {
-    problem: "\\(f(x)=x^3 - kx^2 + 4kx + 4\\) 가 실수 전체 구간에서 단조 증가하려면 \\(k\\)에 어떤 조건이 필요한가?",
-    choices: [
-      "\\(0 \\le k \\le 12\\)",
-      "\\(k=12\\)",
-      "\\(k \\ge 12\\)",
-      "그런 \\(k\\)는 없다"
-    ],
-    correct: 0,
-    answerStr: "정답: \\(0\\le k\\le 12\\)"
-  },
-  {
-    // --- 수정된 문제: 구간 (0,3)에서 감소하도록 하는 k의 범위 ---
-    problem: "\\(f(x)=x^3 - 3x^2 + kx + 1\\) 이 구간 \\((0,3)\\)에서 감소하도록 하는 \\(k\\)의 범위는?",
-    choices: [
-      "\\(k \\le -9\\)",
-      "\\(-9 < k < 0\\)",
-      "\\(k \\ge 0\\)",
-      "그런 \\(k\\)는 없다"
-    ],
-    correct: 0,
-    answerStr: "정답: 1번 (\\(k \\le -9\\))"
-  },
-  {
-    // --- 수정된 문제: 구간 (-2,1)에서 감소하도록 하는 k의 범위 ---
-    problem: "\\(f(x)=x^3 - 6x^2 + kx +1\\) 이 구간 \\((-2,1)\\)에서 감소하도록 하는 \\(k\\)의 범위는?",
-    choices: [
-      "\\(k \\le -36\\)",
-      "\\(-36 < k \\le -3\\)",
-      "모든 \\(k\\)",
-      "그런 \\(k\\)는 없다"
-    ],
-    correct: 0,
-    answerStr: "정답: 1번 (\\(k \\le -36\\))"
-  },
-  {
-    // --- 수정된 문제: 구간 (1,2)에서 증가하도록 하는 k의 범위 ---
-    problem: "\\(f(x)=-x^3 + x^2 + kx -4\\) 이 구간 \\((1,2)\\)에서 증가하도록 하는 \\(k\\)의 범위는?",
-    choices: [
-      "\\(k \\ge 8\\)",
-      "\\(k < 8\\)",
-      "모든 \\(k\\)",
-      "그런 \\(k\\)는 없다"
-    ],
-    correct: 0,
-    answerStr: "정답: 1번 (\\(k \\ge 8\\))"
   }
-  // 마지막 두 문제(상수 a,b를 구하는 문제)는 모호하여 삭제함.
 ];
-
-/* 셔플 함수 (문제나 보기 등을 무작위로 재배치) */
-function shuffleArray(array) {
-  for(let i=array.length-1; i>0; i--){
-    const j = Math.floor(Math.random()* (i+1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-}
 
 /* 전역 변수들 */
 let questionIndex = 0;     // 현재 문제 인덱스
 let score = 0;             // 점수
 let lives = 3;             // 남은 기회
 let totalElapsed = 0;      // 전체 게임 진행 시간(초)
-let timerId = null;        // setInterval용
+let timerId = null;        // 전체 시간 타이머용
 let startTime = 0;         // 게임 시작 시각
-let timeLimit = 0;         // 현재 문제에서의 남은 시간 (하 난이도라면 제한 없음)
-let timeDecrementId = null; // 에너지바 감소용
-let pointPerQuestion = 0;  // 난이도별 점수
-let indefiniteTime = false; // 하 난이도(시간제한없음) 여부
+let timeLimit = 0;         // 현재 문제의 남은 시간 (하 난이도는 제한 없음)
+let timeDecrementId = null; // 에너지바(시간) 타이머용
+let pointPerQuestion = 0;  // 난이도별 문제당 점수
+let indefiniteTime = false; // 하 난이도(시간제한 없음) 여부
+let answered = false;      // 현재 문제에 대해 답변(정답/오답/시간초과)이 확인되었는지 여부
 
 /* -------------------------------------------------------------------
    게임 시작
@@ -645,7 +419,7 @@ function startGame(){
   document.getElementById('playerName').disabled = true;
   document.getElementById('difficulty').disabled = true;
 
-  // 전체 문제 셔플
+  // 문제 셔플
   shuffleArray(questionsData);
 
   questionIndex = 0;
@@ -665,23 +439,27 @@ function startGame(){
     document.getElementById('elapsedTime').innerText = totalElapsed;
   }, 1000);
 
-  // 에너지바 (남은 시간) 타이머
+  // 에너지바(남은 시간) 타이머
   if(timeDecrementId) clearInterval(timeDecrementId);
   timeDecrementId = setInterval(() => {
     if(!indefiniteTime){
       timeLimit -= 1;
-      if(timeLimit <= 0){
-        // 시간 초과 -> 기회 1 감소
+      updateEnergyBar();
+      if(timeLimit <= 0 && !answered){
+        // 시간 초과 처리: 기회 감소 및 "시간 초과" 메시지 표시 후,
+        // 선택지 버튼은 비활성화하고 "다음 문제" 버튼 활성화
         lives--;
-        if(lives<=0) {
+        if(lives <= 0) {
           endGame();
           return;
         }
         document.getElementById('lives').innerText = lives;
-        // 바로 다음문제로 넘어감
-        nextQuestion(true); 
+        answered = true;
+        document.getElementById('answerResult').innerText = "시간 초과!";
+        const btns = document.querySelectorAll('.choice-btn');
+        btns.forEach(btn => btn.disabled = true);
+        document.getElementById('nextBtn').disabled = false;
       }
-      updateEnergyBar();
     }
   }, 1000);
   updateEnergyBar();
@@ -691,6 +469,10 @@ function startGame(){
    문제 표시
    ------------------------------------------------------------------- */
 function showQuestion(q) {
+  answered = false;
+  // 다음 문제 버튼 비활성화
+  document.getElementById('nextBtn').disabled = true;
+
   // 보기 섞기
   const cpyChoices = q.choices.slice();
   shuffleArray(cpyChoices);
@@ -720,57 +502,59 @@ function showQuestion(q) {
    답안 체크
    ------------------------------------------------------------------- */
 function checkAnswer(q, chosen) {
-  // 정답 찾기
-  const idx = q.choices.indexOf(chosen);
-  // 정답 인덱스
+  if(answered) return; // 이미 답변한 경우 무시
+  answered = true;
+  // 원래의 문제 데이터(q.choices)에서 정답 찾기
   const correctChoice = q.choices[q.correct];
 
   let resultMsg = "";
   if(chosen === correctChoice) {
-    // 정답
+    // 정답인 경우
     score += pointPerQuestion;
     document.getElementById('score').innerText = score;
     resultMsg = "정답! 점수 +" + pointPerQuestion;
   } else {
-    // 오답
+    // 오답인 경우
     lives--;
     document.getElementById('lives').innerText = lives;
     resultMsg = "틀렸습니다. " + q.answerStr;
-    if(lives<=0){
+    if(lives <= 0){
+      document.getElementById('answerResult').innerText = resultMsg;
+      const btns = document.querySelectorAll('.choice-btn');
+      btns.forEach(btn => btn.disabled = true);
       endGame();
       return;
     }
   }
   document.getElementById('answerResult').innerText = resultMsg;
+  // 답변 후 모든 선택지 버튼 비활성화
+  const btns = document.querySelectorAll('.choice-btn');
+  btns.forEach(btn => btn.disabled = true);
+  // "다음 문제" 버튼 활성화
+  document.getElementById('nextBtn').disabled = false;
 }
 
 /* -------------------------------------------------------------------
    다음 문제로
-   (forceNext=true 이면 현재 문제 정답체크 없이 강제로 넘김)
    ------------------------------------------------------------------- */
-function nextQuestion(forceNext=false) {
-  if(!forceNext){
-    // 문제를 맞히거나 틀렸을 때 이미 lives가 감소했을 수도 있음
-  }
-  // 모든 문제를 다 풀었으면 다시 섞어서 진행
+function nextQuestion() {
   questionIndex++;
-  if(questionIndex>=questionsData.length){
+  if(questionIndex >= questionsData.length){
     shuffleArray(questionsData);
-    questionIndex=0;
+    questionIndex = 0;
   }
   // 난이도에 따라 시간 리셋 (하 난이도는 제한 없음)
   if(!indefiniteTime){
     switch(document.getElementById('difficulty').value){
       case 'hardest':
-        timeLimit=20; break;
+        timeLimit = 20; break;
       case 'hard':
-        timeLimit=30; break;
+        timeLimit = 30; break;
       case 'normal':
-        timeLimit=40; break;
+        timeLimit = 40; break;
     }
   }
-
-  document.getElementById('answerResult').innerText="";
+  document.getElementById('answerResult').innerText = "";
   showQuestion(questionsData[questionIndex]);
   updateEnergyBar();
 }
@@ -783,18 +567,18 @@ function updateEnergyBar(){
   if(indefiniteTime){
     bar.style.width = "100%"; 
   } else {
-    let maxT=40;
+    let maxT = 40;
     const diff = document.getElementById('difficulty').value;
-    if(diff==='hardest') maxT=20;
-    if(diff==='hard') maxT=30;
+    if(diff === 'hardest') maxT = 20;
+    if(diff === 'hard') maxT = 30;
     let ratio = (timeLimit / maxT);
-    if(ratio<0) ratio=0;
-    bar.style.width = (ratio*100)+"%";
+    if(ratio < 0) ratio = 0;
+    bar.style.width = (ratio * 100) + "%";
   }
 }
 
 /* -------------------------------------------------------------------
-   게임 종료 -> 전송버튼
+   게임 종료 (게임 진행 중 타이머 정지 후 점수 알림)
    ------------------------------------------------------------------- */
 function endGame(){
   if(timerId) clearInterval(timerId);
@@ -809,18 +593,15 @@ function sendScore(){
   const name = document.getElementById('playerName').value.trim();
   saveData("함수의 증가 감소", name, score, totalElapsed);
 }
-</script>
 
-<!-- 점수전송 버튼 오버라이드: endGame() 후에 누르는 용도 -->
-<script>
-function endGame(){
-  if(timerId) clearInterval(timerId);
-  if(timeDecrementId) clearInterval(timeDecrementId);
-  alert("게임이 종료되었습니다. 점수: " + score);
-  // 게임 영역 잠금(선택지 등)
-}
-function endGameButton(){
-  sendScore();
+/* -------------------------------------------------------------------
+   배열 섞기 함수
+   ------------------------------------------------------------------- */
+function shuffleArray(array) {
+  for(let i = array.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
 }
 </script>
 
